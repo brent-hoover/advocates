@@ -1,6 +1,25 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import {
+  Container,
+  Typography,
+  TextField,
+  Button,
+  Paper,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Box,
+  Chip,
+  Stack,
+  CircularProgress
+} from "@mui/material";
+import SearchIcon from "@mui/icons-material/Search";
+import RestartAltIcon from "@mui/icons-material/RestartAlt";
 
 type Advocate = {
   id: number;
@@ -16,92 +35,159 @@ type Advocate = {
 export default function Home() {
   const [advocates, setAdvocates] = useState<Advocate[]>([]);
   const [filteredAdvocates, setFilteredAdvocates] = useState<Advocate[]>([]);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    console.log("fetching advocates...");
-    fetch("/api/advocates").then((response) => {
-      response.json().then((jsonResponse) => {
+    const fetchAdvocates = async () => {
+      try {
+        const response = await fetch("/api/advocates");
+        const jsonResponse = await response.json();
         setAdvocates(jsonResponse.data);
         setFilteredAdvocates(jsonResponse.data);
-      });
-    });
+      } catch (error) {
+        console.error("Error fetching advocates:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchAdvocates();
   }, []);
 
-  const onChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const searchTerm = e.target.value;
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const term = e.target.value;
+    setSearchTerm(term);
 
-    const searchTermElement = document.getElementById("search-term");
-    if (searchTermElement) {
-      searchTermElement.innerHTML = searchTerm;
+    if (term.trim() === "") {
+      setFilteredAdvocates(advocates);
+      return;
     }
 
-    console.log("filtering advocates...");
     const filtered = advocates.filter((advocate) => {
       return (
-        advocate.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        advocate.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        advocate.city.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        advocate.degree.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        advocate.specialties.some(s => s.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        String(advocate.yearsOfExperience).includes(searchTerm)
+        advocate.firstName.toLowerCase().includes(term.toLowerCase()) ||
+        advocate.lastName.toLowerCase().includes(term.toLowerCase()) ||
+        advocate.city.toLowerCase().includes(term.toLowerCase()) ||
+        advocate.degree.toLowerCase().includes(term.toLowerCase()) ||
+        advocate.specialties.some(s => s.toLowerCase().includes(term.toLowerCase())) ||
+        String(advocate.yearsOfExperience).includes(term)
       );
     });
 
     setFilteredAdvocates(filtered);
   };
 
-  const onClick = () => {
-    console.log(advocates);
+  const handleResetSearch = () => {
+    setSearchTerm("");
     setFilteredAdvocates(advocates);
   };
 
+  const formatPhoneNumber = (phoneNumber: number) => {
+    const numStr = phoneNumber.toString();
+    if (numStr.length === 10) {
+      return `(${numStr.slice(0, 3)}) ${numStr.slice(3, 6)}-${numStr.slice(6)}`;
+    }
+    return phoneNumber;
+  };
+
   return (
-    <main style={{ margin: "24px" }}>
-      <h1>Solace Advocates</h1>
-      <br />
-      <br />
-      <div>
-        <p>Search</p>
-        <p>
-          Searching for: <span id="search-term"></span>
-        </p>
-        <input style={{ border: "1px solid black" }} onChange={onChange} />
-        <button onClick={onClick}>Reset Search</button>
-      </div>
-      <br />
-      <br />
-      <table>
-        <thead>
-          <tr>
-            <th>First Name</th>
-            <th>Last Name</th>
-            <th>City</th>
-            <th>Degree</th>
-            <th>Specialties</th>
-            <th>Years of Experience</th>
-            <th>Phone Number</th>
-          </tr>
-        </thead>
-        <tbody>
-          {filteredAdvocates.map((advocate) => {
-            return (
-              <tr key={advocate.id}>
-                <td>{advocate.firstName}</td>
-                <td>{advocate.lastName}</td>
-                <td>{advocate.city}</td>
-                <td>{advocate.degree}</td>
-                <td>
-                  {advocate.specialties.map((s, i) => (
-                    <div key={i}>{s}</div>
-                  ))}
-                </td>
-                <td>{advocate.yearsOfExperience}</td>
-                <td>{advocate.phoneNumber}</td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </main>
+    <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+      <Typography variant="h3" component="h1" gutterBottom>
+        Solace Advocates
+      </Typography>
+
+      <Paper sx={{ p: 3, mb: 4 }}>
+        <Box sx={{ mb: 2 }}>
+          <Typography variant="h6" gutterBottom>
+            Search
+          </Typography>
+          <Box sx={{ mb: 1 }}>
+            {searchTerm && (
+              <Typography variant="body2" color="text.secondary">
+                Searching for: <strong>{searchTerm}</strong>
+              </Typography>
+            )}
+          </Box>
+          <Box sx={{ display: "flex", gap: 2 }}>
+            <TextField
+              fullWidth
+              placeholder="Search advocates..."
+              variant="outlined"
+              size="small"
+              value={searchTerm}
+              onChange={handleSearchChange}
+              InputProps={{
+                startAdornment: <SearchIcon sx={{ mr: 1, color: "text.secondary" }} />,
+              }}
+            />
+            <Button 
+              variant="outlined" 
+              onClick={handleResetSearch}
+              startIcon={<RestartAltIcon />}
+              disabled={!searchTerm}
+            >
+              Reset
+            </Button>
+          </Box>
+        </Box>
+      </Paper>
+
+      {loading ? (
+        <Box sx={{ display: "flex", justifyContent: "center", mt: 4 }}>
+          <CircularProgress />
+        </Box>
+      ) : (
+        <TableContainer component={Paper}>
+          <Table sx={{ minWidth: 650 }}>
+            <TableHead>
+              <TableRow>
+                <TableCell>First Name</TableCell>
+                <TableCell>Last Name</TableCell>
+                <TableCell>City</TableCell>
+                <TableCell>Degree</TableCell>
+                <TableCell>Specialties</TableCell>
+                <TableCell>Experience (Years)</TableCell>
+                <TableCell>Phone Number</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {filteredAdvocates.length > 0 ? (
+                filteredAdvocates.map((advocate) => (
+                  <TableRow key={advocate.id}>
+                    <TableCell>{advocate.firstName}</TableCell>
+                    <TableCell>{advocate.lastName}</TableCell>
+                    <TableCell>{advocate.city}</TableCell>
+                    <TableCell>{advocate.degree}</TableCell>
+                    <TableCell>
+                      <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                        {advocate.specialties.map((specialty, index) => (
+                          <Chip 
+                            key={index} 
+                            label={specialty} 
+                            size="small" 
+                            sx={{ margin: "2px" }}
+                          />
+                        ))}
+                      </Stack>
+                    </TableCell>
+                    <TableCell>{advocate.yearsOfExperience}</TableCell>
+                    <TableCell>{formatPhoneNumber(advocate.phoneNumber)}</TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={7} align="center">
+                    <Typography variant="body1" sx={{ py: 2 }}>
+                      No advocates found
+                    </Typography>
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      )}
+    </Container>
   );
 }

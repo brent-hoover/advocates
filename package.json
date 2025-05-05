@@ -12,6 +12,10 @@
     "seed": "node --loader esbuild-register/loader -r esbuild-register ./src/db/seed/index.ts"
   },
   "dependencies": {
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.0",
+    "@mui/icons-material": "^7.0.2",
+    "@mui/material": "^7.0.2",
     "drizzle-orm": "^0.32.1",
     "next": "^14.2.19",
     "postgres": "^3.4.4",
