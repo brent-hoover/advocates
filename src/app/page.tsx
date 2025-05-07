@@ -42,14 +42,21 @@ export default function Home() {
   // Pagination state
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(5);
+  const [totalCount, setTotalCount] = useState(0);
 
   useEffect(() => {
     const fetchAdvocates = async () => {
       try {
-        const response = await fetch("/api/advocates");
+        setLoading(true);
+        const response = await fetch(`/api/advocates?page=${page}&pageSize=${rowsPerPage}`);
         const jsonResponse = await response.json();
         setAdvocates(jsonResponse.data);
         setFilteredAdvocates(jsonResponse.data);
+        
+        // Update total count from pagination metadata
+        if (jsonResponse.pagination && jsonResponse.pagination.total) {
+          setTotalCount(jsonResponse.pagination.total);
+        }
       } catch (error) {
         console.error("Error fetching advocates:", error);
       } finally {
@@ -58,7 +65,7 @@ export default function Home() {
     };
 
     fetchAdvocates();
-  }, []);
+  }, [page, rowsPerPage]);
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const term = e.target.value;
@@ -108,11 +115,12 @@ export default function Home() {
     setPage(0);
   };
 
-  // Get current page data
-  const paginatedData = filteredAdvocates.slice(
+  // Use the data directly from the API when not filtering
+  // When filtering, paginate on the client side
+  const paginatedData = searchTerm ? filteredAdvocates.slice(
     page * rowsPerPage,
     page * rowsPerPage + rowsPerPage
-  );
+  ) : filteredAdvocates;
 
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
@@ -164,15 +172,15 @@ export default function Home() {
         <Paper>
           <TableContainer>
             <Table sx={{ minWidth: 650 }}>
-              <TableHead>
+              <TableHead sx={{ backgroundColor: 'primary.main' }}>
                 <TableRow>
-                  <TableCell>First Name</TableCell>
-                  <TableCell>Last Name</TableCell>
-                  <TableCell>City</TableCell>
-                  <TableCell>Degree</TableCell>
-                  <TableCell>Specialties</TableCell>
-                  <TableCell>Experience (Years)</TableCell>
-                  <TableCell>Phone Number</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold', color: 'white', fontSize: '1rem' }}>First Name</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold', color: 'white', fontSize: '1rem' }}>Last Name</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold', color: 'white', fontSize: '1rem' }}>City</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold', color: 'white', fontSize: '1rem' }}>Degree</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold', color: 'white', fontSize: '1rem' }}>Specialties</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold', color: 'white', fontSize: '1rem' }}>Experience (Years)</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold', color: 'white', fontSize: '1rem', minWidth: '140px' }}>Phone Number</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -196,7 +204,7 @@ export default function Home() {
                         </Stack>
                       </TableCell>
                       <TableCell>{advocate.yearsOfExperience}</TableCell>
-                      <TableCell>{formatPhoneNumber(advocate.phoneNumber)}</TableCell>
+                      <TableCell sx={{ minWidth: '140px', whiteSpace: 'nowrap' }}>{formatPhoneNumber(advocate.phoneNumber)}</TableCell>
                     </TableRow>
                   ))
                 ) : (
@@ -215,7 +223,7 @@ export default function Home() {
           <TablePagination
             rowsPerPageOptions={[5, 10, 25]}
             component="div"
-            count={filteredAdvocates.length}
+            count={searchTerm ? filteredAdvocates.length : totalCount}
             rowsPerPage={rowsPerPage}
             page={page}
             onPageChange={handleChangePage}
