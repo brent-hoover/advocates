@@ -11,19 +11,14 @@ export async function GET(request: NextRequest) {
   // Calculate offset for pagination
   const offset = page * pageSize;
   
-  // Get paginated data
-  const data = await db.select()
-    .from(advocates)
-    .limit(pageSize)
-    .offset(offset);
+  // Get all data from the database
+  const allData = await db.select().from(advocates);
+  
+  // Handle pagination manually to avoid TypeScript errors with the ORM
+  const data = allData.slice(offset, offset + pageSize);
   
   // Get total count for pagination metadata
-  const countResult = await db.select({ 
-    count: sql<number>`count(*)`.mapWith(Number) 
-  })
-  .from(advocates);
-  
-  const totalCount = countResult[0].count;
+  const totalCount = allData.length;
   
   return Response.json({ 
     data,
