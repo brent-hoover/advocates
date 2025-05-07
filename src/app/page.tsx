@@ -16,7 +16,8 @@ import {
   Box,
   Chip,
   Stack,
-  CircularProgress
+  CircularProgress,
+  TablePagination
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
 import RestartAltIcon from "@mui/icons-material/RestartAlt";
@@ -37,6 +38,10 @@ export default function Home() {
   const [filteredAdvocates, setFilteredAdvocates] = useState<Advocate[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(true);
+  
+  // Pagination state
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(5);
 
   useEffect(() => {
     const fetchAdvocates = async () => {
@@ -58,6 +63,7 @@ export default function Home() {
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const term = e.target.value;
     setSearchTerm(term);
+    setPage(0); // Reset to first page when searching
 
     if (term.trim() === "") {
       setFilteredAdvocates(advocates);
@@ -81,6 +87,7 @@ export default function Home() {
   const handleResetSearch = () => {
     setSearchTerm("");
     setFilteredAdvocates(advocates);
+    setPage(0); // Reset to first page when clearing search
   };
 
   const formatPhoneNumber = (phoneNumber: number) => {
@@ -90,6 +97,22 @@ export default function Home() {
     }
     return phoneNumber;
   };
+
+  // Pagination handlers
+  const handleChangePage = (_event: unknown, newPage: number) => {
+    setPage(newPage);
+  };
+
+  const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
+  };
+
+  // Get current page data
+  const paginatedData = filteredAdvocates.slice(
+    page * rowsPerPage,
+    page * rowsPerPage + rowsPerPage
+  );
 
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
@@ -138,55 +161,67 @@ export default function Home() {
           <CircularProgress />
         </Box>
       ) : (
-        <TableContainer component={Paper}>
-          <Table sx={{ minWidth: 650 }}>
-            <TableHead>
-              <TableRow>
-                <TableCell>First Name</TableCell>
-                <TableCell>Last Name</TableCell>
-                <TableCell>City</TableCell>
-                <TableCell>Degree</TableCell>
-                <TableCell>Specialties</TableCell>
-                <TableCell>Experience (Years)</TableCell>
-                <TableCell>Phone Number</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {filteredAdvocates.length > 0 ? (
-                filteredAdvocates.map((advocate) => (
-                  <TableRow key={advocate.id}>
-                    <TableCell>{advocate.firstName}</TableCell>
-                    <TableCell>{advocate.lastName}</TableCell>
-                    <TableCell>{advocate.city}</TableCell>
-                    <TableCell>{advocate.degree}</TableCell>
-                    <TableCell>
-                      <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-                        {advocate.specialties.map((specialty, index) => (
-                          <Chip 
-                            key={index} 
-                            label={specialty} 
-                            size="small" 
-                            sx={{ margin: "2px" }}
-                          />
-                        ))}
-                      </Stack>
-                    </TableCell>
-                    <TableCell>{advocate.yearsOfExperience}</TableCell>
-                    <TableCell>{formatPhoneNumber(advocate.phoneNumber)}</TableCell>
-                  </TableRow>
-                ))
-              ) : (
+        <Paper>
+          <TableContainer>
+            <Table sx={{ minWidth: 650 }}>
+              <TableHead>
                 <TableRow>
-                  <TableCell colSpan={7} align="center">
-                    <Typography variant="body1" sx={{ py: 2 }}>
-                      No advocates found
-                    </Typography>
-                  </TableCell>
+                  <TableCell>First Name</TableCell>
+                  <TableCell>Last Name</TableCell>
+                  <TableCell>City</TableCell>
+                  <TableCell>Degree</TableCell>
+                  <TableCell>Specialties</TableCell>
+                  <TableCell>Experience (Years)</TableCell>
+                  <TableCell>Phone Number</TableCell>
                 </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </TableContainer>
+              </TableHead>
+              <TableBody>
+                {paginatedData.length > 0 ? (
+                  paginatedData.map((advocate) => (
+                    <TableRow key={advocate.id}>
+                      <TableCell>{advocate.firstName}</TableCell>
+                      <TableCell>{advocate.lastName}</TableCell>
+                      <TableCell>{advocate.city}</TableCell>
+                      <TableCell>{advocate.degree}</TableCell>
+                      <TableCell>
+                        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                          {advocate.specialties.map((specialty, index) => (
+                            <Chip 
+                              key={index} 
+                              label={specialty} 
+                              size="small" 
+                              sx={{ margin: "2px" }}
+                            />
+                          ))}
+                        </Stack>
+                      </TableCell>
+                      <TableCell>{advocate.yearsOfExperience}</TableCell>
+                      <TableCell>{formatPhoneNumber(advocate.phoneNumber)}</TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={7} align="center">
+                      <Typography variant="body1" sx={{ py: 2 }}>
+                        No advocates found
+                      </Typography>
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+          
+          <TablePagination
+            rowsPerPageOptions={[5, 10, 25]}
+            component="div"
+            count={filteredAdvocates.length}
+            rowsPerPage={rowsPerPage}
+            page={page}
+            onPageChange={handleChangePage}
+            onRowsPerPageChange={handleChangeRowsPerPage}
+          />
+        </Paper>
       )}
     </Container>
   );
