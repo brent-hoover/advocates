@@ -1,5 +1,19 @@
 import { NextRequest } from "next/server";
-import { advocateData } from "../../../db/seed/advocates";
+import db from "../../../db";
+import { advocates } from "../../../db/schema";
+
+// Define the Advocate type
+type Advocate = {
+  id: number;
+  firstName: string;
+  lastName: string;
+  city: string;
+  degree: string;
+  specialties: string[];
+  yearsOfExperience: number;
+  phoneNumber: number;
+  createdAt: Date | null;
+};
 
 export async function GET(request: NextRequest) {
   try {
@@ -11,8 +25,25 @@ export async function GET(request: NextRequest) {
     const specialty = searchParams.get("specialty") || "";
     const searchTerm = searchParams.get("search") || "";
     
-    // Start with all data
-    let filteredData = advocateData;
+    // Get data from database
+    let filteredData: Advocate[] = [];
+    
+    try {
+      const dbAdvocates = await db.select().from(advocates);
+      
+      // Ensure specialties is properly cast as string[]
+      filteredData = dbAdvocates.map(advocate => ({
+        ...advocate,
+        specialties: advocate.specialties as unknown as string[]
+      }));
+    } catch (error) {
+      console.error("Error fetching from database:", error);
+      return Response.json({ 
+        error: "Failed to connect to database",
+        data: [],
+        pagination: { total: 0, page: 0, pageSize: 0, pageCount: 0 }
+      }, { status: 500 });
+    }
     
     // Apply city filter if provided
     if (city) {
