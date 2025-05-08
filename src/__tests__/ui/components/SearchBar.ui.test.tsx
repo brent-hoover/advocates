@@ -1,7 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '../test-utils';
+import { render, screen } from '../test-utils';
+import userEvent from '@testing-library/user-event';
 import './setup-test';
-import { TextField, Button } from '@mui/material';
+import { TextField, Button, Box } from '@mui/material';
 
 // Simple Search component for testing
 const SearchBar = ({ onSearch, onReset }) => {
@@ -12,21 +13,23 @@ const SearchBar = ({ onSearch, onReset }) => {
   };
 
   return (
-    <form onSubmit={handleSubmit} data-testid="search-form">
+    <Box component="form" onSubmit={handleSubmit} data-testid="search-form" sx={{ display: 'flex', gap: 2 }}>
       <TextField 
         name="search"
         placeholder="Search advocates..."
         inputProps={{ 'data-testid': 'search-input' }}
+        fullWidth
       />
-      <Button type="submit" data-testid="search-button">Search</Button>
+      <Button type="submit" data-testid="search-button" variant="contained">Search</Button>
       <Button 
         type="button" 
         onClick={onReset}
         data-testid="reset-button"
+        variant="outlined"
       >
         Reset
       </Button>
-    </form>
+    </Box>
   );
 };
 
@@ -39,25 +42,27 @@ describe('SearchBar Component', () => {
     expect(screen.getByTestId('reset-button')).toBeInTheDocument();
   });
 
-  it('should call onSearch with input value when form is submitted', () => {
+  it('should call onSearch with input value when form is submitted', async () => {
     const handleSearch = vi.fn();
     render(<SearchBar onSearch={handleSearch} onReset={() => {}} />);
     
+    const user = userEvent.setup();
     const input = screen.getByTestId('search-input');
-    fireEvent.change(input, { target: { value: 'John' } });
+    await user.type(input, 'John');
     
     const form = screen.getByTestId('search-form');
-    fireEvent.submit(form);
+    await user.type(input, '{enter}');
     
     expect(handleSearch).toHaveBeenCalledWith('John');
   });
 
-  it('should call onReset when reset button is clicked', () => {
+  it('should call onReset when reset button is clicked', async () => {
     const handleReset = vi.fn();
     render(<SearchBar onSearch={() => {}} onReset={handleReset} />);
     
+    const user = userEvent.setup();
     const resetButton = screen.getByTestId('reset-button');
-    fireEvent.click(resetButton);
+    await user.click(resetButton);
     
     expect(handleReset).toHaveBeenCalled();
   });
