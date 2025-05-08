@@ -4,9 +4,15 @@ import postgres from "postgres";
 const setup = () => {
   if (!process.env.DATABASE_URL) {
     console.error("DATABASE_URL is not set");
+    // Provide a mock implementation that includes insert method
     return {
       select: () => ({
         from: () => [],
+      }),
+      insert: () => ({
+        values: () => ({
+          returning: () => Promise.resolve([]),
+        }),
       }),
     };
   }

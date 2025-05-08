@@ -21,7 +21,8 @@ import {
   FormControl,
   InputLabel,
   Select,
-  MenuItem
+  MenuItem,
+  SelectChangeEvent
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
 import RestartAltIcon from "@mui/icons-material/RestartAlt";
@@ -62,13 +63,17 @@ export default function Home() {
       .then(result => {
         if (result && Array.isArray(result.data)) {
           // Extract unique cities for filter
-          const cities = [...new Set(result.data.map((a: Advocate) => a.city))].sort();
+          const citySet = new Set<string>();
+          result.data.forEach((a: Advocate) => citySet.add(a.city));
+          const cities = Array.from(citySet).sort();
           setAvailableCities(cities);
           
           // Extract unique specialties for filter
-          const specialties = [...new Set(
-            result.data.flatMap((a: Advocate) => a.specialties)
-          )].sort();
+          const specialtySet = new Set<string>();
+          result.data.forEach((a: Advocate) => {
+            a.specialties.forEach(specialty => specialtySet.add(specialty));
+          });
+          const specialties = Array.from(specialtySet).sort();
           setAvailableSpecialties(specialties);
         }
       })
@@ -118,12 +123,12 @@ export default function Home() {
     setPage(0); // Reset to first page when clearing search
   };
   
-  const handleCityChange = (event: any) => {
+  const handleCityChange = (event: SelectChangeEvent<string>) => {
     setCityFilter(event.target.value);
     setPage(0); // Reset to first page when changing filter
   };
   
-  const handleSpecialtyChange = (event: any) => {
+  const handleSpecialtyChange = (event: SelectChangeEvent<string>) => {
     setSpecialtyFilter(event.target.value);
     setPage(0); // Reset to first page when changing filter
   };
@@ -137,11 +142,11 @@ export default function Home() {
   };
 
   // Pagination handlers
-  const handleChangePage = (_event: unknown, newPage: number) => {
+  const handleChangePage = (_event: React.MouseEvent<HTMLButtonElement> | null, newPage: number) => {
     setPage(newPage);
   };
 
-  const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setRowsPerPage(parseInt(event.target.value, 10));
     setPage(0);
   };
@@ -214,8 +219,17 @@ export default function Home() {
                     PaperProps: {
                       style: {
                         maxHeight: 300,
-                        minWidth: '100%'
+                        width: 'auto',
+                        minWidth: '200px'
                       }
+                    },
+                    anchorOrigin: {
+                      vertical: 'bottom',
+                      horizontal: 'left'
+                    },
+                    transformOrigin: {
+                      vertical: 'top',
+                      horizontal: 'left'
                     }
                   }}
                 >
@@ -223,7 +237,14 @@ export default function Home() {
                     <em>All Cities</em>
                   </MenuItem>
                   {availableCities.map((city) => (
-                    <MenuItem key={city} value={city}>
+                    <MenuItem 
+                      key={city} 
+                      value={city}
+                      sx={{ 
+                        padding: '6px 16px',
+                        textAlign: 'left'
+                      }}
+                    >
                       {city}
                     </MenuItem>
                   ))}
@@ -242,8 +263,17 @@ export default function Home() {
                     PaperProps: {
                       style: {
                         maxHeight: 300,
-                        minWidth: '100%'
+                        width: 'auto',
+                        minWidth: '200px'
                       }
+                    },
+                    anchorOrigin: {
+                      vertical: 'bottom',
+                      horizontal: 'left'
+                    },
+                    transformOrigin: {
+                      vertical: 'top',
+                      horizontal: 'left'
                     }
                   }}
                 >
@@ -251,7 +281,16 @@ export default function Home() {
                     <em>All Specialties</em>
                   </MenuItem>
                   {availableSpecialties.map((specialty) => (
-                    <MenuItem key={specialty} value={specialty}>
+                    <MenuItem 
+                      key={specialty} 
+                      value={specialty}
+                      sx={{ 
+                        padding: '6px 16px',
+                        textAlign: 'left',
+                        whiteSpace: 'normal',
+                        wordBreak: 'break-word'
+                      }}
+                    >
                       {specialty}
                     </MenuItem>
                   ))}
