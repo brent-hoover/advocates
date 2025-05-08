@@ -16,3 +16,4 @@
 3. Add Husky for code quality checks on commit
 4. Add Github CI/CD workflow to run tests and linting
 5. Add Deployment to Heroku/Railway
+6. More tests
