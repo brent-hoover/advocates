@@ -1,91 +1,468 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
+import {
+  Container,
+  Typography,
+  TextField,
+  Button,
+  Paper,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Box,
+  Chip,
+  Stack,
+  CircularProgress,
+  TablePagination,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  SelectChangeEvent,
+  LinearProgress
+} from "@mui/material";
+import SearchIcon from "@mui/icons-material/Search";
+import RestartAltIcon from "@mui/icons-material/RestartAlt";
+
+type Advocate = {
+  id: number;
+  firstName: string;
+  lastName: string;
+  city: string;
+  degree: string;
+  specialties: string[];
+  yearsOfExperience: number;
+  phoneNumber: number;
+};
 
 export default function Home() {
-  const [advocates, setAdvocates] = useState([]);
-  const [filteredAdvocates, setFilteredAdvocates] = useState([]);
+  const [advocates, setAdvocates] = useState<Advocate[]>([]);
+  const [filteredAdvocates, setFilteredAdvocates] = useState<Advocate[]>([]);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [loading, setLoading] = useState(true); // Start with loading state true
+  const [error, setError] = useState<string | null>(null);
+  const [isPaginationLoading, setIsPaginationLoading] = useState(false);
+  
+  // Pagination state
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(5);
+  const [totalCount, setTotalCount] = useState(0);
+  
+  // Filter state
+  const [cityFilter, setCityFilter] = useState("");
+  const [specialtyFilter, setSpecialtyFilter] = useState("");
+  const [availableCities, setAvailableCities] = useState<string[]>([]);
+  const [availableSpecialties, setAvailableSpecialties] = useState<string[]>([]);
 
+  // Load initial data and get available filters
   useEffect(() => {
-    console.log("fetching advocates...");
-    fetch("/api/advocates").then((response) => {
-      response.json().then((jsonResponse) => {
-        setAdvocates(jsonResponse.data);
-        setFilteredAdvocates(jsonResponse.data);
+    // Fetch all advocates to extract filter options
+    fetch('/api/advocates')
+      .then(response => response.json())
+      .then(result => {
+        if (result && Array.isArray(result.data)) {
+          // Extract unique cities for filter
+          const citySet = new Set<string>();
+          result.data.forEach((a: Advocate) => citySet.add(a.city));
+          const cities = Array.from(citySet).sort();
+          setAvailableCities(cities);
+          
+          // Extract unique specialties for filter
+          const specialtySet = new Set<string>();
+          result.data.forEach((a: Advocate) => {
+            a.specialties.forEach(specialty => specialtySet.add(specialty));
+          });
+          const specialties = Array.from(specialtySet).sort();
+          setAvailableSpecialties(specialties);
+        }
+      })
+      .catch(error => {
+        console.error('Error fetching filter options:', error);
       });
-    });
   }, []);
+  
+  // Track if this is the initial load or a filter change vs. just pagination
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const [isFilterChange, setIsFilterChange] = useState(false);
+  
+  // Reference to track previous search params
+  const prevSearchTermRef = useRef(searchTerm);
+  const prevCityFilterRef = useRef(cityFilter);
+  const prevSpecialtyFilterRef = useRef(specialtyFilter);
+  
+  // Fetch filtered data whenever filters, search term, or pagination change
+  useEffect(() => {
+    // Only show full-page loading on initial load or filter changes, not pagination
+    const isFilterChangeDetected = 
+      prevSearchTermRef.current !== searchTerm ||
+      prevCityFilterRef.current !== cityFilter ||
+      prevSpecialtyFilterRef.current !== specialtyFilter;
+    
+    // Update refs for next comparison
+    prevSearchTermRef.current = searchTerm;
+    prevCityFilterRef.current = cityFilter;
+    prevSpecialtyFilterRef.current = specialtyFilter;
+    
+    if (isInitialLoad || isFilterChangeDetected) {
+      setLoading(true);
+      if (isFilterChangeDetected) {
+        setIsFilterChange(true);
+      }
+    }
+    
+    // Build URL with all filters and pagination
+    let url = `/api/advocates?page=${page}&pageSize=${rowsPerPage}`;
+    if (cityFilter) url += `&city=${encodeURIComponent(cityFilter)}`;
+    if (specialtyFilter) url += `&specialty=${encodeURIComponent(specialtyFilter)}`;
+    if (searchTerm) url += `&search=${encodeURIComponent(searchTerm)}`;
+    
+    // Add a small artificial delay for pagination to avoid flickering
+    const fetchData = async () => {
+      try {
+        const response = await fetch(url);
+        
+        if (!response.ok) {
+          throw new Error(`Server responded with status ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        if (data && Array.isArray(data.data)) {
+          setAdvocates(data.data);
+          setFilteredAdvocates(data.data);
+          setTotalCount(data.pagination?.total || data.data.length);
+          setError(null); // Clear any previous errors
+        } else {
+          setError("Invalid data format received from server");
+        }
+      } catch (error: any) {
+        console.error('Fetch error:', error);
+        setError(`Failed to load data: ${error.message}`);
+        // Set empty data on error
+        setAdvocates([]);
+        setFilteredAdvocates([]);
+      } finally {
+        setLoading(false);
+        setIsInitialLoad(false);
+        setIsFilterChange(false);
+        setIsPaginationLoading(false);
+      }
+    };
+    
+    fetchData();
+  }, [page, rowsPerPage, cityFilter, specialtyFilter, searchTerm, isInitialLoad]);
 
-  const onChange = (e) => {
-    const searchTerm = e.target.value;
-
-    document.getElementById("search-term").innerHTML = searchTerm;
-
-    console.log("filtering advocates...");
-    const filteredAdvocates = advocates.filter((advocate) => {
-      return (
-        advocate.firstName.includes(searchTerm) ||
-        advocate.lastName.includes(searchTerm) ||
-        advocate.city.includes(searchTerm) ||
-        advocate.degree.includes(searchTerm) ||
-        advocate.specialties.includes(searchTerm) ||
-        advocate.yearsOfExperience.includes(searchTerm)
-      );
-    });
-
-    setFilteredAdvocates(filteredAdvocates);
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const term = e.target.value;
+    setSearchTerm(term);
+    setPage(0); // Reset to first page when searching
+    // The actual filtering will be handled by the API
   };
 
-  const onClick = () => {
-    console.log(advocates);
-    setFilteredAdvocates(advocates);
+  const handleResetSearch = () => {
+    setSearchTerm("");
+    setCityFilter("");
+    setSpecialtyFilter("");
+    setPage(0); // Reset to first page when clearing search
   };
+  
+  const handleCityChange = (event: SelectChangeEvent<string>) => {
+    setCityFilter(event.target.value);
+    setPage(0); // Reset to first page when changing filter
+  };
+  
+  const handleSpecialtyChange = (event: SelectChangeEvent<string>) => {
+    setSpecialtyFilter(event.target.value);
+    setPage(0); // Reset to first page when changing filter
+  };
+
+  const formatPhoneNumber = (phoneNumber: number) => {
+    const numStr = phoneNumber.toString();
+    if (numStr.length === 10) {
+      return `(${numStr.slice(0, 3)}) ${numStr.slice(3, 6)}-${numStr.slice(6)}`;
+    }
+    return phoneNumber;
+  };
+
+  // Pagination handlers
+  const handleChangePage = (_event: React.MouseEvent<HTMLButtonElement> | null, newPage: number) => {
+    setIsPaginationLoading(true); // Show subtle loading indicator
+    setPage(newPage);
+  };
+
+  const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    setIsPaginationLoading(true); // Show subtle loading indicator
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
+  };
+
+  // Use the data from the API directly since all filtering/pagination is handled server-side
+  const paginatedData = filteredAdvocates;
 
   return (
-    <main style={{ margin: "24px" }}>
-      <h1>Solace Advocates</h1>
-      <br />
-      <br />
-      <div>
-        <p>Search</p>
-        <p>
-          Searching for: <span id="search-term"></span>
-        </p>
-        <input style={{ border: "1px solid black" }} onChange={onChange} />
-        <button onClick={onClick}>Reset Search</button>
-      </div>
-      <br />
-      <br />
-      <table>
-        <thead>
-          <th>First Name</th>
-          <th>Last Name</th>
-          <th>City</th>
-          <th>Degree</th>
-          <th>Specialties</th>
-          <th>Years of Experience</th>
-          <th>Phone Number</th>
-        </thead>
-        <tbody>
-          {filteredAdvocates.map((advocate) => {
-            return (
-              <tr>
-                <td>{advocate.firstName}</td>
-                <td>{advocate.lastName}</td>
-                <td>{advocate.city}</td>
-                <td>{advocate.degree}</td>
-                <td>
-                  {advocate.specialties.map((s) => (
-                    <div>{s}</div>
+    <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+      <Typography variant="h3" component="h1" gutterBottom>
+        Solace Advocates
+      </Typography>
+
+      <Paper sx={{ p: 3, mb: 4 }}>
+        <Box sx={{ mb: 2 }}>
+          <Typography variant="h6" gutterBottom>
+            Search and Filter
+          </Typography>
+          <Box sx={{ mb: 1 }}>
+            {(searchTerm || cityFilter || specialtyFilter) && (
+              <Box sx={{ mb: 2 }}>
+                {searchTerm && (
+                  <Typography variant="body2" color="text.secondary">
+                    Searching for: <strong>{searchTerm}</strong>
+                  </Typography>
+                )}
+                {cityFilter && (
+                  <Typography variant="body2" color="text.secondary">
+                    City filter: <strong>{cityFilter}</strong>
+                  </Typography>
+                )}
+                {specialtyFilter && (
+                  <Typography variant="body2" color="text.secondary">
+                    Specialty filter: <strong>{specialtyFilter}</strong>
+                  </Typography>
+                )}
+              </Box>
+            )}
+          </Box>
+          
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mb: 2 }}>
+            <TextField
+              fullWidth
+              placeholder="Search advocates..."
+              variant="outlined"
+              size="small"
+              value={searchTerm}
+              onChange={handleSearchChange}
+              InputProps={{
+                startAdornment: <SearchIcon sx={{ mr: 1, color: "text.secondary" }} />,
+              }}
+            />
+            
+            <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 2 }}>
+              <FormControl fullWidth size="small">
+                <InputLabel id="city-filter-label">Filter by City</InputLabel>
+                <Select
+                  labelId="city-filter-label"
+                  id="city-filter"
+                  value={cityFilter}
+                  label="Filter by City"
+                  onChange={handleCityChange}
+                  MenuProps={{
+                    PaperProps: {
+                      style: {
+                        maxHeight: 300,
+                        width: 'auto',
+                        minWidth: '200px'
+                      }
+                    },
+                    anchorOrigin: {
+                      vertical: 'bottom',
+                      horizontal: 'left'
+                    },
+                    transformOrigin: {
+                      vertical: 'top',
+                      horizontal: 'left'
+                    }
+                  }}
+                >
+                  <MenuItem value="">
+                    <em>All Cities</em>
+                  </MenuItem>
+                  {availableCities.map((city) => (
+                    <MenuItem 
+                      key={city} 
+                      value={city}
+                      sx={{ 
+                        padding: '6px 16px',
+                        textAlign: 'left'
+                      }}
+                    >
+                      {city}
+                    </MenuItem>
                   ))}
-                </td>
-                <td>{advocate.yearsOfExperience}</td>
-                <td>{advocate.phoneNumber}</td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </main>
+                </Select>
+              </FormControl>
+              
+              <FormControl fullWidth size="small">
+                <InputLabel id="specialty-filter-label">Filter by Specialty</InputLabel>
+                <Select
+                  labelId="specialty-filter-label"
+                  id="specialty-filter"
+                  value={specialtyFilter}
+                  label="Filter by Specialty"
+                  onChange={handleSpecialtyChange}
+                  MenuProps={{
+                    PaperProps: {
+                      style: {
+                        maxHeight: 300,
+                        width: 'auto',
+                        minWidth: '200px'
+                      }
+                    },
+                    anchorOrigin: {
+                      vertical: 'bottom',
+                      horizontal: 'left'
+                    },
+                    transformOrigin: {
+                      vertical: 'top',
+                      horizontal: 'left'
+                    }
+                  }}
+                >
+                  <MenuItem value="">
+                    <em>All Specialties</em>
+                  </MenuItem>
+                  {availableSpecialties.map((specialty) => (
+                    <MenuItem 
+                      key={specialty} 
+                      value={specialty}
+                      sx={{ 
+                        padding: '6px 16px',
+                        textAlign: 'left',
+                        whiteSpace: 'normal',
+                        wordBreak: 'break-word'
+                      }}
+                    >
+                      {specialty}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Box>
+          </Box>
+          
+          <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
+            <Button 
+              variant="outlined" 
+              onClick={handleResetSearch}
+              startIcon={<RestartAltIcon />}
+              disabled={!searchTerm && !cityFilter && !specialtyFilter}
+            >
+              Reset Filters
+            </Button>
+          </Box>
+        </Box>
+      </Paper>
+
+      {/* Always show table regardless of loading */}
+      {(
+        <Paper>
+          <TableContainer>
+            <Table sx={{ minWidth: 650 }}>
+              <TableHead sx={{ backgroundColor: 'primary.main' }}>
+                <TableRow>
+                  <TableCell sx={{ fontWeight: 'bold', color: 'white', fontSize: '1rem' }}>First Name</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold', color: 'white', fontSize: '1rem' }}>Last Name</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold', color: 'white', fontSize: '1rem' }}>City</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold', color: 'white', fontSize: '1rem' }}>Degree</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold', color: 'white', fontSize: '1rem' }}>Specialties</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold', color: 'white', fontSize: '1rem' }}>Experience (Years)</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold', color: 'white', fontSize: '1rem', minWidth: '140px' }}>Phone Number</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {loading ? (
+                  // Show loading indicator
+                  <TableRow>
+                    <TableCell colSpan={7} align="center">
+                      <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", p: 4 }}>
+                        <CircularProgress size={60} thickness={4} sx={{ mb: 2 }} />
+                        <Typography variant="body1" color="text.secondary">
+                          Loading advocates...
+                        </Typography>
+                      </Box>
+                    </TableCell>
+                  </TableRow>
+                ) : error ? (
+                  // Show error message
+                  <TableRow>
+                    <TableCell colSpan={7} align="center">
+                      <Box sx={{ p: 3, bgcolor: "#fff4e5", borderRadius: 1 }}>
+                        <Typography variant="body1" color="error" sx={{ fontWeight: 500 }}>
+                          {error}
+                        </Typography>
+                        <Typography variant="body2" sx={{ mt: 1 }}>
+                          Please try refreshing the page or contact support if the problem persists.
+                        </Typography>
+                      </Box>
+                    </TableCell>
+                  </TableRow>
+                ) : paginatedData.length > 0 ? (
+                  // Map the actual advocate data
+                  paginatedData.map((advocate) => (
+                    <TableRow key={advocate.id}>
+                      <TableCell>{advocate.firstName}</TableCell>
+                      <TableCell>{advocate.lastName}</TableCell>
+                      <TableCell>{advocate.city}</TableCell>
+                      <TableCell>{advocate.degree}</TableCell>
+                      <TableCell>
+                        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                          {advocate.specialties.map((specialty, index) => (
+                            <Chip 
+                              key={index} 
+                              label={specialty} 
+                              size="small" 
+                              sx={{ margin: "2px" }}
+                            />
+                          ))}
+                        </Stack>
+                      </TableCell>
+                      <TableCell>{advocate.yearsOfExperience}</TableCell>
+                      <TableCell sx={{ minWidth: '140px', whiteSpace: 'nowrap' }}>{formatPhoneNumber(advocate.phoneNumber)}</TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  // Show no results message
+                  <TableRow>
+                    <TableCell colSpan={7} align="center">
+                      <Typography variant="body1" sx={{ py: 2 }}>
+                        No advocates found with the current filters. Try adjusting your search criteria.
+                      </Typography>
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+          
+          <Box sx={{ position: 'relative' }}>
+            {isPaginationLoading && (
+              <Box 
+                sx={{ 
+                  position: 'absolute', 
+                  top: 0, 
+                  left: 0, 
+                  right: 0, 
+                  height: 2, 
+                  zIndex: 1 
+                }}
+              >
+                <LinearProgress sx={{ height: '100%' }} />
+              </Box>
+            )}
+            <TablePagination
+              rowsPerPageOptions={[5, 10, 25]}
+              component="div"
+              count={totalCount}
+              rowsPerPage={rowsPerPage}
+              page={page}
+              onPageChange={handleChangePage}
+              onRowsPerPageChange={handleChangeRowsPerPage}
+            />
+          </Box>
+        </Paper>
+      )}
+    </Container>
   );
 }
