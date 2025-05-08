@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import {
   Container,
   Typography,
@@ -22,7 +22,8 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  SelectChangeEvent
+  SelectChangeEvent,
+  LinearProgress
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
 import RestartAltIcon from "@mui/icons-material/RestartAlt";
@@ -44,6 +45,7 @@ export default function Home() {
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(true); // Start with loading state true
   const [error, setError] = useState<string | null>(null);
+  const [isPaginationLoading, setIsPaginationLoading] = useState(false);
   
   // Pagination state
   const [page, setPage] = useState(0);
@@ -83,9 +85,34 @@ export default function Home() {
       });
   }, []);
   
+  // Track if this is the initial load or a filter change vs. just pagination
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const [isFilterChange, setIsFilterChange] = useState(false);
+  
+  // Reference to track previous search params
+  const prevSearchTermRef = useRef(searchTerm);
+  const prevCityFilterRef = useRef(cityFilter);
+  const prevSpecialtyFilterRef = useRef(specialtyFilter);
+  
   // Fetch filtered data whenever filters, search term, or pagination change
   useEffect(() => {
-    setLoading(true);
+    // Only show full-page loading on initial load or filter changes, not pagination
+    const isFilterChangeDetected = 
+      prevSearchTermRef.current !== searchTerm ||
+      prevCityFilterRef.current !== cityFilter ||
+      prevSpecialtyFilterRef.current !== specialtyFilter;
+    
+    // Update refs for next comparison
+    prevSearchTermRef.current = searchTerm;
+    prevCityFilterRef.current = cityFilter;
+    prevSpecialtyFilterRef.current = specialtyFilter;
+    
+    if (isInitialLoad || isFilterChangeDetected) {
+      setLoading(true);
+      if (isFilterChangeDetected) {
+        setIsFilterChange(true);
+      }
+    }
     
     // Build URL with all filters and pagination
     let url = `/api/advocates?page=${page}&pageSize=${rowsPerPage}`;
@@ -93,14 +120,17 @@ export default function Home() {
     if (specialtyFilter) url += `&specialty=${encodeURIComponent(specialtyFilter)}`;
     if (searchTerm) url += `&search=${encodeURIComponent(searchTerm)}`;
     
-    fetch(url)
-      .then(response => {
+    // Add a small artificial delay for pagination to avoid flickering
+    const fetchData = async () => {
+      try {
+        const response = await fetch(url);
+        
         if (!response.ok) {
           throw new Error(`Server responded with status ${response.status}`);
         }
-        return response.json();
-      })
-      .then(data => {
+        
+        const data = await response.json();
+        
         if (data && Array.isArray(data.data)) {
           setAdvocates(data.data);
           setFilteredAdvocates(data.data);
@@ -109,18 +139,22 @@ export default function Home() {
         } else {
           setError("Invalid data format received from server");
         }
-      })
-      .catch(error => {
+      } catch (error: any) {
         console.error('Fetch error:', error);
         setError(`Failed to load data: ${error.message}`);
         // Set empty data on error
         setAdvocates([]);
         setFilteredAdvocates([]);
-      })
-      .finally(() => {
+      } finally {
         setLoading(false);
-      });
-  }, [page, rowsPerPage, cityFilter, specialtyFilter, searchTerm]);
+        setIsInitialLoad(false);
+        setIsFilterChange(false);
+        setIsPaginationLoading(false);
+      }
+    };
+    
+    fetchData();
+  }, [page, rowsPerPage, cityFilter, specialtyFilter, searchTerm, isInitialLoad]);
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const term = e.target.value;
@@ -156,10 +190,12 @@ export default function Home() {
 
   // Pagination handlers
   const handleChangePage = (_event: React.MouseEvent<HTMLButtonElement> | null, newPage: number) => {
+    setIsPaginationLoading(true); // Show subtle loading indicator
     setPage(newPage);
   };
 
   const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    setIsPaginationLoading(true); // Show subtle loading indicator
     setRowsPerPage(parseInt(event.target.value, 10));
     setPage(0);
   };
@@ -400,15 +436,31 @@ export default function Home() {
             </Table>
           </TableContainer>
           
-          <TablePagination
-            rowsPerPageOptions={[5, 10, 25]}
-            component="div"
-            count={totalCount}
-            rowsPerPage={rowsPerPage}
-            page={page}
-            onPageChange={handleChangePage}
-            onRowsPerPageChange={handleChangeRowsPerPage}
-          />
+          <Box sx={{ position: 'relative' }}>
+            {isPaginationLoading && (
+              <Box 
+                sx={{ 
+                  position: 'absolute', 
+                  top: 0, 
+                  left: 0, 
+                  right: 0, 
+                  height: 2, 
+                  zIndex: 1 
+                }}
+              >
+                <LinearProgress sx={{ height: '100%' }} />
+              </Box>
+            )}
+            <TablePagination
+              rowsPerPageOptions={[5, 10, 25]}
+              component="div"
+              count={totalCount}
+              rowsPerPage={rowsPerPage}
+              page={page}
+              onPageChange={handleChangePage}
+              onRowsPerPageChange={handleChangeRowsPerPage}
+            />
+          </Box>
         </Paper>
       )}
     </Container>
