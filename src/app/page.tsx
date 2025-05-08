@@ -77,14 +77,15 @@ export default function Home() {
       });
   }, []);
   
-  // Fetch filtered data whenever filters or pagination change
+  // Fetch filtered data whenever filters, search term, or pagination change
   useEffect(() => {
     setLoading(true);
     
-    // Build URL with filters and pagination
+    // Build URL with all filters and pagination
     let url = `/api/advocates?page=${page}&pageSize=${rowsPerPage}`;
     if (cityFilter) url += `&city=${encodeURIComponent(cityFilter)}`;
     if (specialtyFilter) url += `&specialty=${encodeURIComponent(specialtyFilter)}`;
+    if (searchTerm) url += `&search=${encodeURIComponent(searchTerm)}`;
     
     fetch(url)
       .then(response => response.json())
@@ -101,30 +102,13 @@ export default function Home() {
       .finally(() => {
         setLoading(false);
       });
-  }, [page, rowsPerPage, cityFilter, specialtyFilter]);
+  }, [page, rowsPerPage, cityFilter, specialtyFilter, searchTerm]);
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const term = e.target.value;
     setSearchTerm(term);
     setPage(0); // Reset to first page when searching
-
-    if (term.trim() === "") {
-      setFilteredAdvocates(advocates);
-      return;
-    }
-
-    const filtered = advocates.filter((advocate) => {
-      return (
-        advocate.firstName.toLowerCase().includes(term.toLowerCase()) ||
-        advocate.lastName.toLowerCase().includes(term.toLowerCase()) ||
-        advocate.city.toLowerCase().includes(term.toLowerCase()) ||
-        advocate.degree.toLowerCase().includes(term.toLowerCase()) ||
-        advocate.specialties.some(s => s.toLowerCase().includes(term.toLowerCase())) ||
-        String(advocate.yearsOfExperience).includes(term)
-      );
-    });
-
-    setFilteredAdvocates(filtered);
+    // The actual filtering will be handled by the API
   };
 
   const handleResetSearch = () => {
@@ -168,7 +152,7 @@ export default function Home() {
     searchTerm
   });
   
-  // Use filteredAdvocates and apply client pagination when searching
+  // Use the data from the API directly since all filtering/pagination is handled server-side
   const paginatedData = filteredAdvocates;
 
   return (
@@ -351,7 +335,7 @@ export default function Home() {
           <TablePagination
             rowsPerPageOptions={[5, 10, 25]}
             component="div"
-            count={searchTerm ? filteredAdvocates.length : totalCount}
+            count={totalCount}
             rowsPerPage={rowsPerPage}
             page={page}
             onPageChange={handleChangePage}

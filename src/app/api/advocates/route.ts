@@ -3,12 +3,13 @@ import { advocateData } from "../../../db/seed/advocates";
 
 export async function GET(request: NextRequest) {
   try {
-    // Parse pagination parameters
+    // Parse parameters
     const searchParams = request.nextUrl.searchParams;
     const page = parseInt(searchParams.get("page") || "0");
     const pageSize = parseInt(searchParams.get("pageSize") || "5");
     const city = searchParams.get("city") || "";
     const specialty = searchParams.get("specialty") || "";
+    const searchTerm = searchParams.get("search") || "";
     
     // Start with all data
     let filteredData = advocateData;
@@ -27,6 +28,21 @@ export async function GET(request: NextRequest) {
           s.toLowerCase().includes(specialty.toLowerCase())
         )
       );
+    }
+    
+    // Apply search term if provided
+    if (searchTerm) {
+      filteredData = filteredData.filter(advocate => {
+        const term = searchTerm.toLowerCase();
+        return (
+          advocate.firstName.toLowerCase().includes(term) ||
+          advocate.lastName.toLowerCase().includes(term) ||
+          advocate.city.toLowerCase().includes(term) ||
+          advocate.degree.toLowerCase().includes(term) ||
+          advocate.specialties.some(s => s.toLowerCase().includes(term)) ||
+          String(advocate.yearsOfExperience).includes(term)
+        );
+      });
     }
     
     // Calculate pagination values
