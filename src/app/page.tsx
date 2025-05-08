@@ -17,7 +17,11 @@ import {
   Chip,
   Stack,
   CircularProgress,
-  TablePagination
+  TablePagination,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
 import RestartAltIcon from "@mui/icons-material/RestartAlt";
@@ -37,35 +41,67 @@ export default function Home() {
   const [advocates, setAdvocates] = useState<Advocate[]>([]);
   const [filteredAdvocates, setFilteredAdvocates] = useState<Advocate[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   
   // Pagination state
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(5);
   const [totalCount, setTotalCount] = useState(0);
+  
+  // Filter state
+  const [cityFilter, setCityFilter] = useState("");
+  const [specialtyFilter, setSpecialtyFilter] = useState("");
+  const [availableCities, setAvailableCities] = useState<string[]>([]);
+  const [availableSpecialties, setAvailableSpecialties] = useState<string[]>([]);
 
+  // Load initial data and get available filters
   useEffect(() => {
-    const fetchAdvocates = async () => {
-      try {
-        setLoading(true);
-        const response = await fetch(`/api/advocates?page=${page}&pageSize=${rowsPerPage}`);
-        const jsonResponse = await response.json();
-        setAdvocates(jsonResponse.data);
-        setFilteredAdvocates(jsonResponse.data);
-        
-        // Update total count from pagination metadata
-        if (jsonResponse.pagination && jsonResponse.pagination.total) {
-          setTotalCount(jsonResponse.pagination.total);
+    // Fetch all advocates to extract filter options
+    fetch('/api/advocates')
+      .then(response => response.json())
+      .then(result => {
+        if (result && Array.isArray(result.data)) {
+          // Extract unique cities for filter
+          const cities = [...new Set(result.data.map((a: Advocate) => a.city))].sort();
+          setAvailableCities(cities);
+          
+          // Extract unique specialties for filter
+          const specialties = [...new Set(
+            result.data.flatMap((a: Advocate) => a.specialties)
+          )].sort();
+          setAvailableSpecialties(specialties);
         }
-      } catch (error) {
-        console.error("Error fetching advocates:", error);
-      } finally {
+      })
+      .catch(error => {
+        console.error('Error fetching filter options:', error);
+      });
+  }, []);
+  
+  // Fetch filtered data whenever filters or pagination change
+  useEffect(() => {
+    setLoading(true);
+    
+    // Build URL with filters and pagination
+    let url = `/api/advocates?page=${page}&pageSize=${rowsPerPage}`;
+    if (cityFilter) url += `&city=${encodeURIComponent(cityFilter)}`;
+    if (specialtyFilter) url += `&specialty=${encodeURIComponent(specialtyFilter)}`;
+    
+    fetch(url)
+      .then(response => response.json())
+      .then(data => {
+        if (data && Array.isArray(data.data)) {
+          setAdvocates(data.data);
+          setFilteredAdvocates(data.data);
+          setTotalCount(data.pagination?.total || data.data.length);
+        }
+      })
+      .catch(error => {
+        console.error('Fetch error:', error);
+      })
+      .finally(() => {
         setLoading(false);
-      }
-    };
-
-    fetchAdvocates();
-  }, [page, rowsPerPage]);
+      });
+  }, [page, rowsPerPage, cityFilter, specialtyFilter]);
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const term = e.target.value;
@@ -93,8 +129,19 @@ export default function Home() {
 
   const handleResetSearch = () => {
     setSearchTerm("");
-    setFilteredAdvocates(advocates);
+    setCityFilter("");
+    setSpecialtyFilter("");
     setPage(0); // Reset to first page when clearing search
+  };
+  
+  const handleCityChange = (event: any) => {
+    setCityFilter(event.target.value);
+    setPage(0); // Reset to first page when changing filter
+  };
+  
+  const handleSpecialtyChange = (event: any) => {
+    setSpecialtyFilter(event.target.value);
+    setPage(0); // Reset to first page when changing filter
   };
 
   const formatPhoneNumber = (phoneNumber: number) => {
@@ -115,12 +162,14 @@ export default function Home() {
     setPage(0);
   };
 
-  // Use the data directly from the API when not filtering
-  // When filtering, paginate on the client side
-  const paginatedData = searchTerm ? filteredAdvocates.slice(
-    page * rowsPerPage,
-    page * rowsPerPage + rowsPerPage
-  ) : filteredAdvocates;
+  console.log("Current data:", {
+    advocatesLength: advocates.length,
+    filteredLength: filteredAdvocates.length,
+    searchTerm
+  });
+  
+  // Use filteredAdvocates and apply client pagination when searching
+  const paginatedData = filteredAdvocates;
 
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
@@ -131,16 +180,31 @@ export default function Home() {
       <Paper sx={{ p: 3, mb: 4 }}>
         <Box sx={{ mb: 2 }}>
           <Typography variant="h6" gutterBottom>
-            Search
+            Search and Filter
           </Typography>
           <Box sx={{ mb: 1 }}>
-            {searchTerm && (
-              <Typography variant="body2" color="text.secondary">
-                Searching for: <strong>{searchTerm}</strong>
-              </Typography>
+            {(searchTerm || cityFilter || specialtyFilter) && (
+              <Box sx={{ mb: 2 }}>
+                {searchTerm && (
+                  <Typography variant="body2" color="text.secondary">
+                    Searching for: <strong>{searchTerm}</strong>
+                  </Typography>
+                )}
+                {cityFilter && (
+                  <Typography variant="body2" color="text.secondary">
+                    City filter: <strong>{cityFilter}</strong>
+                  </Typography>
+                )}
+                {specialtyFilter && (
+                  <Typography variant="body2" color="text.secondary">
+                    Specialty filter: <strong>{specialtyFilter}</strong>
+                  </Typography>
+                )}
+              </Box>
             )}
           </Box>
-          <Box sx={{ display: "flex", gap: 2 }}>
+          
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mb: 2 }}>
             <TextField
               fullWidth
               placeholder="Search advocates..."
@@ -152,23 +216,81 @@ export default function Home() {
                 startAdornment: <SearchIcon sx={{ mr: 1, color: "text.secondary" }} />,
               }}
             />
+            
+            <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 2 }}>
+              <FormControl fullWidth size="small">
+                <InputLabel id="city-filter-label">Filter by City</InputLabel>
+                <Select
+                  labelId="city-filter-label"
+                  id="city-filter"
+                  value={cityFilter}
+                  label="Filter by City"
+                  onChange={handleCityChange}
+                  MenuProps={{
+                    PaperProps: {
+                      style: {
+                        maxHeight: 300,
+                        minWidth: '100%'
+                      }
+                    }
+                  }}
+                >
+                  <MenuItem value="">
+                    <em>All Cities</em>
+                  </MenuItem>
+                  {availableCities.map((city) => (
+                    <MenuItem key={city} value={city}>
+                      {city}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              
+              <FormControl fullWidth size="small">
+                <InputLabel id="specialty-filter-label">Filter by Specialty</InputLabel>
+                <Select
+                  labelId="specialty-filter-label"
+                  id="specialty-filter"
+                  value={specialtyFilter}
+                  label="Filter by Specialty"
+                  onChange={handleSpecialtyChange}
+                  MenuProps={{
+                    PaperProps: {
+                      style: {
+                        maxHeight: 300,
+                        minWidth: '100%'
+                      }
+                    }
+                  }}
+                >
+                  <MenuItem value="">
+                    <em>All Specialties</em>
+                  </MenuItem>
+                  {availableSpecialties.map((specialty) => (
+                    <MenuItem key={specialty} value={specialty}>
+                      {specialty}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Box>
+          </Box>
+          
+          <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
             <Button 
               variant="outlined" 
               onClick={handleResetSearch}
               startIcon={<RestartAltIcon />}
-              disabled={!searchTerm}
+              disabled={!searchTerm && !cityFilter && !specialtyFilter}
             >
-              Reset
+              Reset Filters
             </Button>
           </Box>
         </Box>
       </Paper>
 
-      {loading ? (
-        <Box sx={{ display: "flex", justifyContent: "center", mt: 4 }}>
-          <CircularProgress />
-        </Box>
-      ) : (
+      {/* Always show table regardless of loading */}
+      {(
         <Paper>
           <TableContainer>
             <Table sx={{ minWidth: 650 }}>
@@ -185,6 +307,7 @@ export default function Home() {
               </TableHead>
               <TableBody>
                 {paginatedData.length > 0 ? (
+                  // Map the actual advocate data
                   paginatedData.map((advocate) => (
                     <TableRow key={advocate.id}>
                       <TableCell>{advocate.firstName}</TableCell>
@@ -208,10 +331,15 @@ export default function Home() {
                     </TableRow>
                   ))
                 ) : (
+                  // Show backup data in case we still don't have data
                   <TableRow>
                     <TableCell colSpan={7} align="center">
                       <Typography variant="body1" sx={{ py: 2 }}>
-                        No advocates found
+                        No advocates found. Data: {JSON.stringify({
+                          paginatedDataLength: paginatedData.length,
+                          advocatesLength: advocates.length,
+                          filteredLength: filteredAdvocates.length
+                        })}
                       </Typography>
                     </TableCell>
                   </TableRow>
