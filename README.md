@@ -132,6 +132,19 @@ npm run test:coverage
   - City and specialty filtering tests
   - Pagination tests
 
+## Troubleshooting
+
+### Database Reset
+
+If you encounter duplicate entries in the application, you can reset the database using the test page:
+
+1. Navigate to [http://localhost:3000/test](http://localhost:3000/test)
+2. Scroll down to the "Database Management" section
+3. Click the "Reset Database" button
+4. Wait for the confirmation message
+
+This will clear all existing advocate data and re-seed the database with fresh data without duplicates.
+
 ## API Documentation
 
 ### Advocates API
@@ -169,6 +182,24 @@ npm run test:coverage
     "pageSize": 5,
     "pageCount": 6
   }
+}
+```
+
+### Seed API
+
+**Endpoint:** `/api/seed`
+
+**Method:** POST
+
+**Description:** Resets the database by removing all existing advocate data and inserting fresh data.
+
+**Example Response:**
+```json
+{
+  "success": true,
+  "message": "Database successfully seeded",
+  "count": 15,
+  "advocates": [...]
 }
 ```
 
