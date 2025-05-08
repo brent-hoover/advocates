@@ -37,3 +37,5 @@ yarn-error.log*
 next-env.d.ts
 search_and_list.tsx
 
+
+**/.claude/settings.local.json

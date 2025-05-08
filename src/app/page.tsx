@@ -42,7 +42,8 @@ export default function Home() {
   const [advocates, setAdvocates] = useState<Advocate[]>([]);
   const [filteredAdvocates, setFilteredAdvocates] = useState<Advocate[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true); // Start with loading state true
+  const [error, setError] = useState<string | null>(null);
   
   // Pagination state
   const [page, setPage] = useState(0);
@@ -93,16 +94,28 @@ export default function Home() {
     if (searchTerm) url += `&search=${encodeURIComponent(searchTerm)}`;
     
     fetch(url)
-      .then(response => response.json())
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`Server responded with status ${response.status}`);
+        }
+        return response.json();
+      })
       .then(data => {
         if (data && Array.isArray(data.data)) {
           setAdvocates(data.data);
           setFilteredAdvocates(data.data);
           setTotalCount(data.pagination?.total || data.data.length);
+          setError(null); // Clear any previous errors
+        } else {
+          setError("Invalid data format received from server");
         }
       })
       .catch(error => {
         console.error('Fetch error:', error);
+        setError(`Failed to load data: ${error.message}`);
+        // Set empty data on error
+        setAdvocates([]);
+        setFilteredAdvocates([]);
       })
       .finally(() => {
         setLoading(false);
@@ -151,12 +164,6 @@ export default function Home() {
     setPage(0);
   };
 
-  console.log("Current data:", {
-    advocatesLength: advocates.length,
-    filteredLength: filteredAdvocates.length,
-    searchTerm
-  });
-  
   // Use the data from the API directly since all filtering/pagination is handled server-side
   const paginatedData = filteredAdvocates;
 
@@ -329,7 +336,33 @@ export default function Home() {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {paginatedData.length > 0 ? (
+                {loading ? (
+                  // Show loading indicator
+                  <TableRow>
+                    <TableCell colSpan={7} align="center">
+                      <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", p: 4 }}>
+                        <CircularProgress size={60} thickness={4} sx={{ mb: 2 }} />
+                        <Typography variant="body1" color="text.secondary">
+                          Loading advocates...
+                        </Typography>
+                      </Box>
+                    </TableCell>
+                  </TableRow>
+                ) : error ? (
+                  // Show error message
+                  <TableRow>
+                    <TableCell colSpan={7} align="center">
+                      <Box sx={{ p: 3, bgcolor: "#fff4e5", borderRadius: 1 }}>
+                        <Typography variant="body1" color="error" sx={{ fontWeight: 500 }}>
+                          {error}
+                        </Typography>
+                        <Typography variant="body2" sx={{ mt: 1 }}>
+                          Please try refreshing the page or contact support if the problem persists.
+                        </Typography>
+                      </Box>
+                    </TableCell>
+                  </TableRow>
+                ) : paginatedData.length > 0 ? (
                   // Map the actual advocate data
                   paginatedData.map((advocate) => (
                     <TableRow key={advocate.id}>
@@ -354,15 +387,11 @@ export default function Home() {
                     </TableRow>
                   ))
                 ) : (
-                  // Show backup data in case we still don't have data
+                  // Show no results message
                   <TableRow>
                     <TableCell colSpan={7} align="center">
                       <Typography variant="body1" sx={{ py: 2 }}>
-                        No advocates found. Data: {JSON.stringify({
-                          paginatedDataLength: paginatedData.length,
-                          advocatesLength: advocates.length,
-                          filteredLength: filteredAdvocates.length
-                        })}
+                        No advocates found with the current filters. Try adjusting your search criteria.
                       </Typography>
                     </TableCell>
                   </TableRow>
